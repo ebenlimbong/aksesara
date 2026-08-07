@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String               @id @default(uuid())
+  email        String               @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  memberships  OrganizationMember[]
+  versions     FormVersion[]
+  reviews      ReviewHistory[]
+}
+
+model Organization {
+  id        String               @id @default(uuid())
+  name      String
+  slug      String               @unique
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  members   OrganizationMember[]
+  projects  Project[]
+}
+
+model OrganizationMember {
+  id             String       @id @default(uuid())
+  organizationId String
+  userId         String
+  role           String       @default("member") // owner, developer, reviewer, viewer
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+model Project {
+  id             String          @id @default(uuid())
+  organizationId String
+  name           String
+  slug           String
+  publicKey      String          @unique // e.g. aks_pk_demo
+  environment    String          @default("development") // development, production
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  domains        AllowedDomain[]
+  apiKeys        ApiKey[]
+  forms          FormProfile[]
+  events         UsageEvent[]
+
+  @@unique([organizationId, slug])
+}
+
+model AllowedDomain {
+  id                 String    @id @default(uuid())
+  projectId          String
+  origin             String // e.g. https://demo-campus.local
+  verificationStatus String    @default("pending") // pending, verified, failed
+  verificationToken  String    @default(uuid())
+  verifiedAt         DateTime?
+  project            Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, origin])
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  projectId  String
+  keyPrefix  String // e.g. aks_sk_
+  keyHash    String // Hashed secret key
+  scopes     String // JSON string or comma-separated scopes
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model FormProfile {
+  id              String        @id @default(uuid())
+  projectId       String
+  externalFormId  String // e.g. scholarship-2026
+  title           String
+  origin          String
+  status          String        @default("draft") // draft, published, archived
+  activeVersionId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions        FormVersion[]
+  events          UsageEvent[]
+
+  @@unique([projectId, externalFormId])
+}
+
+model FormVersion {
+  id                 String          @id @default(uuid())
+  formProfileId      String
+  version            String // e.g. 1.0.0
+  schemaJson         String // Complete JSON schema string
+  integritySignature String? // HMAC signature for verification
+  status             String          @default("draft") // draft, published, archived
+  publishedAt        DateTime?
+  createdById        String?
+  createdAt          DateTime        @default(now())
+  formProfile        FormProfile     @relation(fields: [formProfileId], references: [id], onDelete: Cascade)
+  createdBy          User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  fields             FieldMetadata[]
+}
+
+model FieldMetadata {
+  id                 String          @id @default(uuid())
+  formVersionId      String
+  externalFieldId    String
+  selector           String
+  fieldType          String // text, number, email, select, radio, checkbox, etc.
+  officialLabel      String
+  simpleLabel        String?
+  helpText           String?
+  example            String?
+  sensitivity        String          @default("normal") // normal, identity, financial, health, credential, legal
+  required           Boolean         @default(false)
+  constraintsJson    String?
+  aiConfidence       Float?
+  verificationStatus String          @default("unverified") // unverified, ai-suggested, verified, rejected
+  formVersion        FormVersion     @relation(fields: [formVersionId], references: [id], onDelete: Cascade)
+  suggestions        AiSuggestion[]
+  reviewHistory      ReviewHistory[]
+}
+
+model AiSuggestion {
+  id              String        @id @default(uuid())
+  fieldMetadataId String
+  inputHash       String
+  outputJson      String
+  provider        String        @default("mock")
+  model           String        @default("mock-v1")
+  confidence      Float         @default(1.0)
+  status          String        @default("pending") // pending, approved, edited, rejected
+  createdAt       DateTime      @default(now())
+  fieldMetadata   FieldMetadata @relation(fields: [fieldMetadataId], references: [id], onDelete: Cascade)
+}
+
+model ReviewHistory {
+  id              String        @id @default(uuid())
+  fieldMetadataId String
+  reviewerId      String
+  action          String // approve, edit, reject
+  beforeJson      String?
+  afterJson       String?
+  createdAt       DateTime      @default(now())
+  fieldMetadata   FieldMetadata @relation(fields: [fieldMetadataId], references: [id], onDelete: Cascade)
+  reviewer        User          @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+}
+
+model UsageEvent {
+  id               String       @id @default(uuid())
+  projectId        String
+  formProfileId    String?
+  eventType        String // scan_success, scan_fail, feature_used, etc.
+  aggregatePayload String // Aggregated non-sensitive JSON payload ONLY
+  createdAt        DateTime     @default(now())
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  formProfile      FormProfile? @relation(fields: [formProfileId], references: [id], onDelete: SetNull)
+}

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Wrapper script for pnpm inside monorepo workspace
+if [ "$1" = "add" ]; then
+  shift
+  exec npx pnpm@9 add -w "$@"
+else
+  exec npx pnpm@9 "$@"
+fi

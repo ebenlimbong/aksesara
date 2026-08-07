@@ -1,0 +1,16 @@
+{
+  "name": "@aksesara/bridge",
+  "version": "0.1.0",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm,iife --global-name AksesaraBridge --dts",
+    "dev": "tsup src/index.ts --format cjs,esm,iife --global-name AksesaraBridge --dts --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.2",
+    "typescript": "^5.3.3"
+  }
+}

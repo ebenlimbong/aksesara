@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: aksesara-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: aksesara_user
+      POSTGRES_PASSWORD: aksesara_selamanya
+      POSTGRES_DB: aksesera
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
