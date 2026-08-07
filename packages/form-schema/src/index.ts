@@ -105,6 +105,8 @@ export const SanitizedFieldInputSchema = z.object({
   fieldType: z.string(),
   officialLabel: z.string().min(1).max(500),
   instruction: z.string().max(500).optional().default(''),
+  helpText: z.string().max(500).optional().default(''),
+  example: z.string().max(500).optional().default(''),
   required: z.boolean().default(false),
   constraints: z
     .object({

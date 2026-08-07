@@ -16,4 +16,10 @@ export class AiAssistanceController {
     const parsed = AssistFieldsRequestSchema.parse(body);
     return this.aiService.processFieldAssistance(parsed);
   }
+
+  @Post('simplify-fields')
+  async simplifyFields(@Body() body: AssistFieldsRequest) {
+    const parsed = AssistFieldsRequestSchema.parse(body);
+    return this.aiService.processFieldAssistance(parsed);
+  }
 }

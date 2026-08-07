@@ -4,12 +4,13 @@ import { HealthController } from './health/health.controller';
 import { AiAssistanceController } from './ai-assistance/ai-assistance.controller';
 import { AiAssistanceService } from './ai-assistance/ai-assistance.service';
 import { MockAiProvider } from './ai-assistance/mock-ai.provider';
+import { GeminiAiProvider } from './ai-assistance/gemini-ai.provider';
 import { PublicIntegrationController } from './public-integration/public-integration.controller';
 import { PublicIntegrationService } from './public-integration/public-integration.service';
 
 @Module({
   imports: [],
   controllers: [HealthController, AiAssistanceController, PublicIntegrationController],
-  providers: [PrismaService, AiAssistanceService, MockAiProvider, PublicIntegrationService],
+  providers: [PrismaService, AiAssistanceService, MockAiProvider, GeminiAiProvider, PublicIntegrationService],
 })
 export class AppModule {}

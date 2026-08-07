@@ -8,6 +8,11 @@ export default function SidePanel() {
   const [showOriginalText, setShowOriginalText] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
 
+  // AI Feature States
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMode, setAiMode] = useState<'explanation' | 'example' | null>(null);
+  const [aiResults, setAiResults] = useState<Record<string, { explanation?: string; example?: string }>>({});
+
   // Accessibility States
   const [textSize, setTextSize] = useState<'normal' | 'large' | 'xlarge'>('normal');
   const [highContrast, setHighContrast] = useState(false);
@@ -53,6 +58,83 @@ export default function SidePanel() {
   };
 
   const currentNode: FormNode | undefined = formGraph?.nodes[currentIndex];
+
+  // Request AI Assistance from Backend (Google Gemini API)
+  const callGeminiAi = async (requestedMode: 'explanation' | 'example') => {
+    if (!currentNode) return;
+    setAiLoading(true);
+    setAiMode(requestedMode);
+
+    try {
+      const sanitizedPayload = {
+        locale: 'id-ID',
+        fields: [
+          {
+            nodeId: currentNode.nodeId,
+            officialLabel: currentNode.officialLabel,
+            fieldType: currentNode.fieldType,
+            instruction: currentNode.helpText || '',
+            helpText: currentNode.helpText || '',
+            example: currentNode.example || '',
+            required: currentNode.required || false,
+            sensitivity: currentNode.sensitivity || 'normal',
+          },
+        ],
+      };
+
+      const res = await fetch('http://localhost:4000/api/v1/assist/fields', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sanitizedPayload),
+      });
+
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+
+      const data = await res.json();
+      const aiOutput = data.fields?.[0];
+
+      if (aiOutput) {
+        setAiResults((prev) => ({
+          ...prev,
+          [currentNode.nodeId]: {
+            ...prev[currentNode.nodeId],
+            explanation: aiOutput.helpText || `Isikan data ${currentNode.officialLabel} Anda.`,
+            example: aiOutput.exampleFormat || 'Contoh: Bandung, Jakarta, Medan',
+          },
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching Gemini AI:', error);
+      
+      // Contextual client fallback if backend is unreachable
+      let fallbackExample = 'Contoh: Isikan data sesuai dokumen resmi Anda.';
+      const labelLower = currentNode.officialLabel.toLowerCase();
+      if (labelLower.includes('lahir')) {
+        fallbackExample = 'Contoh: Bandung, Jakarta, Medan, Lampung';
+      } else if (labelLower.includes('kecamatan') || labelLower.includes('wil')) {
+        fallbackExample = 'Contoh: Kec. Coblong, Kec. Sukajadi, Kec. Tiga Panah';
+      } else if (labelLower.includes('jalan') || labelLower.includes('alamat')) {
+        fallbackExample = 'Contoh: Jl. Merdeka No. 45, RT 02/RW 05';
+      } else if (labelLower.includes('gaji') || labelLower.includes('penghasilan') || labelLower.includes('income')) {
+        fallbackExample = 'Contoh: Rp 3.500.000,00';
+      } else if (labelLower.includes('email')) {
+        fallbackExample = 'Contoh: nama@student.itera.ac.id';
+      } else if (labelLower.includes('telepon') || labelLower.includes('hp') || labelLower.includes('wa')) {
+        fallbackExample = 'Contoh: 081234567890';
+      }
+
+      setAiResults((prev) => ({
+        ...prev,
+        [currentNode.nodeId]: {
+          ...prev[currentNode.nodeId],
+          explanation: `Isikan data ${currentNode.officialLabel} sesuai dengan dokumen resmi Anda.`,
+          example: fallbackExample,
+        },
+      }));
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const handleValueChange = (val: any) => {
     if (!currentNode) return;
@@ -112,6 +194,7 @@ export default function SidePanel() {
     if (currentIndex < formGraph.nodes.length - 1) {
       setCurrentIndex((prev) => prev + 1);
       setShowOriginalText(false);
+      setAiMode(null);
     } else {
       setIsReviewing(true);
     }
@@ -123,6 +206,7 @@ export default function SidePanel() {
     } else if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
       setShowOriginalText(false);
+      setAiMode(null);
     }
   };
 
@@ -155,6 +239,8 @@ export default function SidePanel() {
     );
   }
 
+  const activeAi = currentNode ? aiResults[currentNode.nodeId] : undefined;
+
   return (
     <div className={`${containerStyle} p-4 font-sans flex flex-col justify-between`}>
       {/* Header Bar */}
@@ -179,7 +265,7 @@ export default function SidePanel() {
                 : 'bg-amber-100 text-amber-800'
             }`}
           >
-            {formGraph.mode === 'verified' ? '✓ Terverifikasi Institusi' : 'Mode Universal'}
+            {formGraph.mode === 'verified' ? '✓ Terverifikasi' : 'Mode Universal'}
           </span>
         </div>
 
@@ -246,22 +332,71 @@ export default function SidePanel() {
                       ? stopSpeak()
                       : handleSpeak(currentNode.simpleLabel || currentNode.officialLabel)
                   }
-                  className="bg-blue-100 hover:bg-blue-200 text-blue-800 p-2 rounded-full text-xs flex items-center justify-center shrink-0"
+                  className="bg-blue-100 hover:bg-blue-200 text-blue-800 p-2 rounded-full text-xs flex items-center justify-center shrink-0 ml-2"
                   title="Dengarkan Suara"
                 >
                   🔊
                 </button>
               </div>
 
-              {/* Help Text / Format Example */}
-              {currentNode.helpText && (
-                <div className="text-sm bg-blue-50 text-blue-900 p-3 rounded-lg border border-blue-100">
+              {/* 2 Gemini AI Action Buttons */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  onClick={() => callGeminiAi('explanation')}
+                  disabled={aiLoading}
+                  className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all border flex items-center justify-center gap-1 shadow-sm ${
+                    aiMode === 'explanation'
+                      ? 'bg-blue-600 text-white border-blue-700'
+                      : 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
+                  }`}
+                >
+                  {aiLoading && aiMode === 'explanation' ? '⏳ Memuat AI...' : '💡 Penjelasan (AI)'}
+                </button>
+
+                <button
+                  onClick={() => callGeminiAi('example')}
+                  disabled={aiLoading}
+                  className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all border flex items-center justify-center gap-1 shadow-sm ${
+                    aiMode === 'example'
+                      ? 'bg-purple-600 text-white border-purple-700'
+                      : 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100'
+                  }`}
+                >
+                  {aiLoading && aiMode === 'example' ? '⏳ Memuat AI...' : '📝 Contoh Jawaban (AI)'}
+                </button>
+              </div>
+
+              {/* AI Explanation Box */}
+              {aiMode === 'explanation' && activeAi?.explanation && (
+                <div className="text-xs bg-blue-50 border border-blue-200 text-blue-900 p-3 rounded-lg space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-blue-800">
+                    <span>💡 Penjelasan Singkat (Gemini AI):</span>
+                  </div>
+                  <p className="leading-relaxed font-medium">{activeAi.explanation}</p>
+                </div>
+              )}
+
+              {/* AI Example Box */}
+              {aiMode === 'example' && activeAi?.example && (
+                <div className="text-xs bg-purple-50 border border-purple-200 text-purple-900 p-3 rounded-lg space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-purple-800">
+                    <span>📝 Contoh Jawaban (Gemini AI):</span>
+                  </div>
+                  <p className="font-semibold text-purple-950 bg-white p-2.5 rounded border border-purple-200 leading-relaxed">
+                    {activeAi.example}
+                  </p>
+                </div>
+              )}
+
+              {/* Original Help Text (if no AI mode active) */}
+              {!aiMode && currentNode.helpText && (
+                <div className="text-xs bg-gray-50 text-gray-800 p-2.5 rounded-lg border border-gray-200">
                   💡 {currentNode.helpText}
                 </div>
               )}
 
               {/* Input Component */}
-              <div className="pt-2">
+              <div className="pt-1">
                 {currentNode.fieldType === 'textarea' ? (
                   <textarea
                     rows={4}
