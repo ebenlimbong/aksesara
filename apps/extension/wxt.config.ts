@@ -1,9 +1,14 @@
 import { defineConfig } from 'wxt';
 
 export default defineConfig({
-  // 💡 Menikmatkan auto-launch browser baru saat pnpm dev dijalankan
+  // 💡 Mematikan auto-launch browser baru saat pnpm dev dijalankan
   runner: {
     disabled: true,
+  },
+  dev: {
+    server: {
+      port: 3002, // 🔒 Mengunci port dev server WXT/Vite di 3002
+    },
   },
   manifest: {
     name: 'Aksesara — Pendamping Aksesibilitas Formulir Web',
@@ -13,6 +18,11 @@ export default defineConfig({
     host_permissions: ['<all_urls>'],
     action: {
       default_title: 'Buka Aksesara',
+    },
+    // 🛡️ Mengizinkan skrip HMR Vite dari localhost:3002 agar tidak diblokir CSP Chrome
+    content_security_policy: {
+      extension_pages:
+        "script-src 'self' 'wasm-unsafe-eval' http://localhost:3002; object-src 'self';",
     },
   },
   srcDir: 'src',
