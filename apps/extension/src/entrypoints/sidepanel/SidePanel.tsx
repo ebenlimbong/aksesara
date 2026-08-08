@@ -14,15 +14,13 @@ export default function SidePanel() {
   const [aiResults, setAiResults] = useState<Record<string, { explanation?: string; example?: string }>>({});
 
   // Accessibility States
-  const [textSize, setTextSize] = useState<'normal' | 'large' | 'xlarge'>('normal');
+  const [textSize, setTextSize] = useState<'normal' | 'large' | 'xlarge'>('large'); // Default dibuat Large
   const [highContrast, setHighContrast] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   useEffect(() => {
-    // Initial scanning request on mount
     scanTabForm();
 
-    // Listen for form scan broadcasts from content script
     if (typeof chrome !== 'undefined' && chrome.runtime) {
       const listener = (message: any) => {
         if (message.type === 'FORM_SCANNED' && message.payload) {
@@ -34,32 +32,57 @@ export default function SidePanel() {
     }
   }, []);
 
-  const scanTabForm = () => {
+  const scanTabForm = async () => {
     if (typeof chrome !== 'undefined' && chrome.tabs) {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, { type: 'SCAN_FORM' }, (res) => {
-            if (res?.graph) {
-              initFormGraph(res.graph);
-            }
-          });
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        const activeTab = tabs[0];
+        if (!activeTab?.id) return;
+
+        if (chrome.scripting) {
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: activeTab.id },
+              files: ['content-scripts/content.js'],
+            });
+          } catch (e) {
+            // Ignore if script is already present
+          }
         }
+
+        chrome.tabs.sendMessage(activeTab.id, { type: 'SCAN_FORM' }, (res) => {
+          if (chrome.runtime.lastError) {
+            chrome.tabs.sendMessage(activeTab.id, { type: 'PARSE_FORM' }, (resParse) => {
+              const graphData = resParse?.graph || (resParse?.forms ? resParse.forms[0] : null);
+              if (graphData) initFormGraph(graphData);
+            });
+            return;
+          }
+
+          const graphData = res?.graph || (res?.forms ? res.forms[0] : null);
+          if (graphData) initFormGraph(graphData);
+        });
       });
     }
   };
 
   const initFormGraph = (graph: FormGraph) => {
     setFormGraph(graph);
+    setCurrentIndex(0);
+    setIsReviewing(false);
+    setShowOriginalText(false);
+    setAiMode(null);
+
     const initialAnswers: Record<string, any> = {};
-    graph.nodes.forEach((node) => {
-      initialAnswers[node.nodeId] = node.currentValue || '';
-    });
+    if (graph.nodes) {
+      graph.nodes.forEach((node) => {
+        initialAnswers[node.nodeId] = node.currentValue || '';
+      });
+    }
     setAnswers(initialAnswers);
   };
 
-  const currentNode: FormNode | undefined = formGraph?.nodes[currentIndex];
+  const currentNode: FormNode | undefined = formGraph?.nodes?.[currentIndex];
 
-  // Request AI Assistance from Backend (Google Gemini API)
   const callGeminiAi = async (requestedMode: 'explanation' | 'example') => {
     if (!currentNode) return;
     setAiLoading(true);
@@ -104,24 +127,13 @@ export default function SidePanel() {
         }));
       }
     } catch (error) {
-      console.error('Error fetching Gemini AI:', error);
-      
-      // Contextual client fallback if backend is unreachable
-      let fallbackExample = 'Contoh: Isikan data sesuai dokumen resmi Anda.';
-      const labelLower = currentNode.officialLabel.toLowerCase();
-      if (labelLower.includes('lahir')) {
-        fallbackExample = 'Contoh: Bandung, Jakarta, Medan, Lampung';
-      } else if (labelLower.includes('kecamatan') || labelLower.includes('wil')) {
-        fallbackExample = 'Contoh: Kec. Coblong, Kec. Sukajadi, Kec. Tiga Panah';
-      } else if (labelLower.includes('jalan') || labelLower.includes('alamat')) {
-        fallbackExample = 'Contoh: Jl. Merdeka No. 45, RT 02/RW 05';
-      } else if (labelLower.includes('gaji') || labelLower.includes('penghasilan') || labelLower.includes('income')) {
-        fallbackExample = 'Contoh: Rp 3.500.000,00';
-      } else if (labelLower.includes('email')) {
-        fallbackExample = 'Contoh: nama@student.itera.ac.id';
-      } else if (labelLower.includes('telepon') || labelLower.includes('hp') || labelLower.includes('wa')) {
-        fallbackExample = 'Contoh: 081234567890';
-      }
+      let fallbackExample = 'Isikan data sesuai dokumen resmi Anda.';
+      const labelLower = (currentNode.officialLabel || '').toLowerCase();
+      if (labelLower.includes('lahir')) fallbackExample = 'Bandung, Jakarta, Medan, Lampung';
+      else if (labelLower.includes('kecamatan') || labelLower.includes('wil')) fallbackExample = 'Kec. Coblong, Kec. Sukajadi';
+      else if (labelLower.includes('jalan') || labelLower.includes('alamat')) fallbackExample = 'Jl. Merdeka No. 45, RT 02/RW 05';
+      else if (labelLower.includes('email')) fallbackExample = 'nama@student.itera.ac.id';
+      else if (labelLower.includes('telepon') || labelLower.includes('hp') || labelLower.includes('wa')) fallbackExample = '081234567890';
 
       setAiResults((prev) => ({
         ...prev,
@@ -140,7 +152,6 @@ export default function SidePanel() {
     if (!currentNode) return;
     setAnswers((prev) => ({ ...prev, [currentNode.nodeId]: val }));
 
-    // Synchronize directly to DOM of target page
     if (typeof chrome !== 'undefined' && chrome.tabs) {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
@@ -175,7 +186,7 @@ export default function SidePanel() {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'id-ID';
-      utterance.rate = 1.0;
+      utterance.rate = 0.9; // Kecepatan bicara dibuat sedikit lebih lambat & jelas
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       window.speechSynthesis.speak(utterance);
@@ -190,7 +201,7 @@ export default function SidePanel() {
   };
 
   const handleNext = () => {
-    if (!formGraph) return;
+    if (!formGraph || !formGraph.nodes) return;
     if (currentIndex < formGraph.nodes.length - 1) {
       setCurrentIndex((prev) => prev + 1);
       setShowOriginalText(false);
@@ -210,30 +221,45 @@ export default function SidePanel() {
     }
   };
 
-  // Font size classes
-  const fontClass =
-    textSize === 'xlarge' ? 'text-xl' : textSize === 'large' ? 'text-lg' : 'text-base';
+  const handleRefreshForm = async () => {
+    await scanTabForm();
+  };
 
-  // Contrast container style
+  // Dynamic Typography Styles
+  const fontTitleClass = textSize === 'xlarge' ? 'text-2xl' : textSize === 'large' ? 'text-xl' : 'text-lg';
+  const fontBodyClass = textSize === 'xlarge' ? 'text-lg' : textSize === 'large' ? 'text-base' : 'text-sm';
+
+  // High Contrast Themes
   const containerStyle = highContrast
-    ? 'bg-black text-yellow-300 min-h-screen border-l border-yellow-400'
-    : 'bg-white text-gray-900 min-h-screen border-l border-gray-200';
+    ? 'bg-black text-yellow-300 min-h-screen p-4 border-l-4 border-yellow-400 font-sans'
+    : 'bg-slate-50 text-slate-900 min-h-screen p-4 border-l border-slate-200 font-sans';
 
-  if (!formGraph || formGraph.nodes.length === 0) {
+  const cardStyle = highContrast
+    ? 'border-2 border-yellow-300 bg-black p-4 rounded-xl space-y-4'
+    : 'border-2 border-blue-200 bg-white p-4 rounded-xl shadow-sm space-y-4';
+
+  const buttonPrimary = highContrast
+    ? 'bg-yellow-300 text-black font-extrabold hover:bg-yellow-400 focus:ring-4 focus:ring-white'
+    : 'bg-blue-700 text-white font-bold hover:bg-blue-800 focus:ring-4 focus:ring-blue-300';
+
+  if (!formGraph || !formGraph.nodes || formGraph.nodes.length === 0) {
     return (
-      <div className={`${containerStyle} p-6 flex flex-col items-center justify-center space-y-4 text-center`}>
-        <div className="w-12 h-12 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center font-bold text-xl">
+      <div className={`${containerStyle} flex flex-col items-center justify-center space-y-6 text-center min-h-screen`}>
+        <div className="w-16 h-16 bg-blue-700 text-white rounded-full flex items-center justify-center font-bold text-2xl shadow-lg">
           A
         </div>
-        <h2 className="text-xl font-bold">Belum Ada Formulir Terdeteksi</h2>
-        <p className="text-sm opacity-80 max-w-xs">
-          Buka halaman web yang memiliki formulir isian, lalu tekan tombol di bawah untuk memindai ulang.
-        </p>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black">Formulir Belum Siap</h2>
+          <p className={`${fontBodyClass} opacity-90 max-w-xs`}>
+            Buka halaman yang memiliki formulir di web, lalu tekan tombol besar di bawah.
+          </p>
+        </div>
         <button
           onClick={scanTabForm}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-5 py-2.5 rounded-lg shadow"
+          className={`${buttonPrimary} text-lg px-6 py-4 rounded-xl shadow-lg border-2 w-full max-w-xs`}
+          aria-label="Memindai Ulang Formulir pada Tab Aktif"
         >
-          Pindai Formulir Tab Aktif
+          🔄 Pindai Formulir Web
         </button>
       </div>
     );
@@ -242,52 +268,72 @@ export default function SidePanel() {
   const activeAi = currentNode ? aiResults[currentNode.nodeId] : undefined;
 
   return (
-    <div className={`${containerStyle} p-4 font-sans flex flex-col justify-between`}>
-      {/* Header Bar */}
-      <div>
-        <div className="flex items-center justify-between border-b pb-3 mb-4">
-          <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-sm">
+    <div className={`${containerStyle} flex flex-col justify-between min-h-screen`}>
+      {/* 🟢 HEADER ACCESSIBILITY BAR */}
+      <header className="space-y-3">
+        <div className="flex items-center justify-between border-b pb-3 border-current">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-blue-700 text-white rounded-lg flex items-center justify-center font-black text-lg">
               A
             </div>
             <div>
-              <h1 className="font-bold text-base leading-tight">Aksesara</h1>
-              <p className="text-[10px] opacity-75">
+              <h1 className="font-extrabold text-lg leading-tight">Aksesara</h1>
+              <p className="text-xs font-medium opacity-80 truncate max-w-[140px]">
                 {formGraph.title || 'Formulir Web'}
               </p>
             </div>
           </div>
 
-          <span
-            className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-              formGraph.mode === 'verified'
-                ? 'bg-emerald-100 text-emerald-800'
-                : 'bg-amber-100 text-amber-800'
+          {/* Tombol Pindai Ulang Menonjol */}
+          <button
+            onClick={handleRefreshForm}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border-2 transition-all ${
+              highContrast
+                ? 'border-yellow-300 text-yellow-300 hover:bg-yellow-300 hover:text-black'
+                : 'border-blue-600 bg-blue-50 text-blue-800 hover:bg-blue-100'
             }`}
+            title="Pindai ulang halaman jika pertanyaan belum muncul"
+            aria-label="Pindai Ulang Formulir Halaman Ini"
           >
-            {formGraph.mode === 'verified' ? '✓ Terverifikasi' : 'Mode Universal'}
-          </span>
+            <span className="text-base">🔄</span>
+            <span>Pindai Ulang</span>
+          </button>
         </div>
 
-        {/* Accessibility Toolbar */}
-        <div className="flex items-center justify-between bg-gray-100 text-gray-800 p-2 rounded-lg text-xs mb-4">
-          <div className="flex items-center space-x-1">
-            <span className="font-semibold text-[10px] uppercase tracking-wider">Ukuran Teks:</span>
+        {/* 🛠️ TOOLBAR AKSESIBILITAS UTAMA */}
+        <div
+          className={`p-3 rounded-xl flex items-center justify-between gap-2 ${
+            highContrast ? 'bg-zinc-900 border border-yellow-300' : 'bg-slate-200 text-slate-900'
+          }`}
+          role="region"
+          aria-label="Pengaturan Aksesibilitas Teks dan Kontras"
+        >
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-bold uppercase tracking-wider mr-1">Teks:</span>
             <button
               onClick={() => setTextSize('normal')}
-              className={`px-2 py-0.5 rounded ${textSize === 'normal' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+              className={`px-2.5 py-1 text-xs font-bold rounded-md min-h-[36px] ${
+                textSize === 'normal' ? 'bg-blue-700 text-white' : 'bg-white text-black'
+              }`}
+              aria-label="Ukuran Teks Normal"
             >
               A
             </button>
             <button
               onClick={() => setTextSize('large')}
-              className={`px-2 py-0.5 rounded text-sm ${textSize === 'large' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+              className={`px-2.5 py-1 text-sm font-bold rounded-md min-h-[36px] ${
+                textSize === 'large' ? 'bg-blue-700 text-white' : 'bg-white text-black'
+              }`}
+              aria-label="Ukuran Teks Besark"
             >
               A+
             </button>
             <button
               onClick={() => setTextSize('xlarge')}
-              className={`px-2 py-0.5 rounded text-base font-bold ${textSize === 'xlarge' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+              className={`px-2.5 py-1 text-base font-black rounded-md min-h-[36px] ${
+                textSize === 'xlarge' ? 'bg-blue-700 text-white' : 'bg-white text-black'
+              }`}
+              aria-label="Ukuran Teks Sangat Besar"
             >
               A++
             </button>
@@ -295,123 +341,129 @@ export default function SidePanel() {
 
           <button
             onClick={() => setHighContrast(!highContrast)}
-            className="bg-gray-800 text-white px-2 py-1 rounded text-[11px] font-medium"
+            className={`px-3 py-1.5 rounded-md text-xs font-bold border-2 min-h-[36px] ${
+              highContrast ? 'bg-yellow-300 text-black border-yellow-300' : 'bg-slate-800 text-white border-slate-800'
+            }`}
           >
-            {highContrast ? 'Mode Normal' : 'Kontras Tinggi'}
+            {highContrast ? '☀️ Normal' : '🌙 Kontras'}
           </button>
         </div>
+      </header>
 
-        {/* Main Content Area */}
+      {/* 🟡 AREA ISI UTAMA PERTANYAAN */}
+      <main className="my-4 flex-1">
         {!isReviewing && currentNode ? (
-          <div className="space-y-4">
-            {/* Progress Bar */}
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span>Langkah {currentIndex + 1} dari {formGraph.nodes.length}</span>
+          <div className="space-y-4" role="aria-live" aria-live="polite">
+            {/* Indikator Langkah */}
+            <div className="space-y-1">
+              <div className="flex justify-between font-bold text-sm">
+                <span>Pertanyaan {currentIndex + 1} dari {formGraph.nodes.length}</span>
                 <span>{Math.round(((currentIndex + 1) / formGraph.nodes.length) * 100)}%</span>
               </div>
-              <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-300 h-3 rounded-full overflow-hidden">
                 <div
-                  className="bg-blue-600 h-2 transition-all duration-300"
+                  className={`h-3 transition-all duration-300 ${highContrast ? 'bg-yellow-300' : 'bg-blue-700'}`}
                   style={{ width: `${((currentIndex + 1) / formGraph.nodes.length) * 100}%` }}
                 />
               </div>
             </div>
 
-            {/* Question Box */}
-            <div className="border p-4 rounded-xl space-y-3 bg-opacity-10">
-              <div className="flex justify-between items-start">
-                <h2 className={`${fontClass} font-bold leading-snug`}>
+            {/* KOTAK PERTANYAAN */}
+            <div className={cardStyle}>
+              <div className="flex justify-between items-start gap-2">
+                <h2 className={`${fontTitleClass} font-black leading-snug`}>
                   {currentNode.simpleLabel || currentNode.officialLabel}
-                  {currentNode.required && <span className="text-red-500 ml-1">*</span>}
+                  {currentNode.required && <span className="text-red-500 ml-1" aria-label="Wajib diisi">*</span>}
                 </h2>
 
+                {/* Tombol Audio Bantuan */}
                 <button
                   onClick={() =>
                     isSpeaking
                       ? stopSpeak()
                       : handleSpeak(currentNode.simpleLabel || currentNode.officialLabel)
                   }
-                  className="bg-blue-100 hover:bg-blue-200 text-blue-800 p-2 rounded-full text-xs flex items-center justify-center shrink-0 ml-2"
-                  title="Dengarkan Suara"
+                  className={`p-3 rounded-full text-lg shrink-0 flex items-center justify-center font-bold min-w-[48px] min-h-[48px] ${
+                    isSpeaking
+                      ? 'bg-red-600 text-white animate-pulse'
+                      : highContrast
+                      ? 'bg-yellow-300 text-black'
+                      : 'bg-blue-100 text-blue-900 border-2 border-blue-300'
+                  }`}
+                  title="Bacakan Pertanyaan"
+                  aria-label="Bacakan Teks Pertanyaan Ini"
                 >
                   🔊
                 </button>
               </div>
 
-              {/* 2 Gemini AI Action Buttons */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
+              {/* BANTUAN AI (Satu Kolom yang Jelas) */}
+              <div className="grid grid-cols-2 gap-2 pt-2">
                 <button
                   onClick={() => callGeminiAi('explanation')}
                   disabled={aiLoading}
-                  className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all border flex items-center justify-center gap-1 shadow-sm ${
+                  className={`py-3 px-2 rounded-xl text-xs font-extrabold border-2 min-h-[44px] flex items-center justify-center gap-1 ${
                     aiMode === 'explanation'
-                      ? 'bg-blue-600 text-white border-blue-700'
-                      : 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
+                      ? 'bg-blue-700 text-white border-blue-900'
+                      : 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100'
                   }`}
                 >
-                  {aiLoading && aiMode === 'explanation' ? '⏳ Memuat AI...' : '💡 Penjelasan (AI)'}
+                  {aiLoading && aiMode === 'explanation' ? '⏳ Memuat...' : '💡 Penjelasan (AI)'}
                 </button>
 
                 <button
                   onClick={() => callGeminiAi('example')}
                   disabled={aiLoading}
-                  className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all border flex items-center justify-center gap-1 shadow-sm ${
+                  className={`py-3 px-2 rounded-xl text-xs font-extrabold border-2 min-h-[44px] flex items-center justify-center gap-1 ${
                     aiMode === 'example'
-                      ? 'bg-purple-600 text-white border-purple-700'
-                      : 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100'
+                      ? 'bg-purple-700 text-white border-purple-900'
+                      : 'bg-purple-50 text-purple-900 border-purple-300 hover:bg-purple-100'
                   }`}
                 >
-                  {aiLoading && aiMode === 'example' ? '⏳ Memuat AI...' : '📝 Contoh Jawaban (AI)'}
+                  {aiLoading && aiMode === 'example' ? '⏳ Memuat...' : '📝 Contoh (AI)'}
                 </button>
               </div>
 
-              {/* AI Explanation Box */}
+              {/* AI Result Cards */}
               {aiMode === 'explanation' && activeAi?.explanation && (
-                <div className="text-xs bg-blue-50 border border-blue-200 text-blue-900 p-3 rounded-lg space-y-1">
-                  <div className="font-bold flex items-center gap-1 text-blue-800">
-                    <span>💡 Penjelasan Singkat (Gemini AI):</span>
-                  </div>
-                  <p className="leading-relaxed font-medium">{activeAi.explanation}</p>
+                <div className={`p-3 rounded-lg border-2 text-sm ${highContrast ? 'bg-zinc-900 border-yellow-300' : 'bg-blue-50 border-blue-300 text-blue-950'}`}>
+                  <strong className="block mb-1">💡 Penjelasan:</strong>
+                  <p className={fontBodyClass}>{activeAi.explanation}</p>
                 </div>
               )}
 
-              {/* AI Example Box */}
               {aiMode === 'example' && activeAi?.example && (
-                <div className="text-xs bg-purple-50 border border-purple-200 text-purple-900 p-3 rounded-lg space-y-1">
-                  <div className="font-bold flex items-center gap-1 text-purple-800">
-                    <span>📝 Contoh Jawaban (Gemini AI):</span>
-                  </div>
-                  <p className="font-semibold text-purple-950 bg-white p-2.5 rounded border border-purple-200 leading-relaxed">
+                <div className={`p-3 rounded-lg border-2 text-sm ${highContrast ? 'bg-zinc-900 border-yellow-300' : 'bg-purple-50 border-purple-300 text-purple-950'}`}>
+                  <strong className="block mb-1">📝 Contoh Jawaban:</strong>
+                  <p className={`${fontBodyClass} font-bold p-2 bg-white rounded border border-purple-200 text-slate-900`}>
                     {activeAi.example}
                   </p>
                 </div>
               )}
 
-              {/* Original Help Text (if no AI mode active) */}
-              {!aiMode && currentNode.helpText && (
-                <div className="text-xs bg-gray-50 text-gray-800 p-2.5 rounded-lg border border-gray-200">
-                  💡 {currentNode.helpText}
-                </div>
-              )}
-
-              {/* Input Component */}
-              <div className="pt-1">
+              {/* INPUT FORM UTAMA */}
+              <div className="pt-2">
                 {currentNode.fieldType === 'textarea' ? (
                   <textarea
                     rows={4}
                     value={answers[currentNode.nodeId] || ''}
                     onChange={(e) => handleValueChange(e.target.value)}
-                    className="w-full p-3 border rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-600"
+                    className={`w-full p-4 border-2 rounded-xl font-medium focus:ring-4 ${fontBodyClass} ${
+                      highContrast ? 'bg-black text-yellow-300 border-yellow-300' : 'bg-white text-slate-900 border-slate-400 focus:ring-blue-300'
+                    }`}
                     placeholder="Tuliskan jawaban Anda di sini..."
+                    aria-label={currentNode.simpleLabel || currentNode.officialLabel}
                   />
                 ) : currentNode.fieldType === 'select' ? (
                   <select
                     value={answers[currentNode.nodeId] || ''}
                     onChange={(e) => handleValueChange(e.target.value)}
-                    className="w-full p-3 border rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-600"
+                    className={`w-full p-4 border-2 rounded-xl font-bold min-h-[52px] ${fontBodyClass} ${
+                      highContrast ? 'bg-black text-yellow-300 border-yellow-300' : 'bg-white text-slate-900 border-slate-400 focus:ring-blue-300'
+                    }`}
+                    aria-label={currentNode.simpleLabel || currentNode.officialLabel}
                   >
-                    <option value="">-- Pilih Salah Satu --</option>
+                    <option value="">-- Klik untuk Pilih Jawaban --</option>
                     {currentNode.options?.map((opt, i) => (
                       <option key={i} value={opt.value}>
                         {opt.label}
@@ -423,57 +475,56 @@ export default function SidePanel() {
                     type={currentNode.fieldType === 'number' ? 'number' : 'text'}
                     value={answers[currentNode.nodeId] || ''}
                     onChange={(e) => handleValueChange(e.target.value)}
-                    className="w-full p-3 border rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-600"
-                    placeholder={currentNode.example ? `Contoh: ${currentNode.example}` : 'Ketik jawaban Anda...'}
+                    className={`w-full p-4 border-2 rounded-xl font-medium min-h-[52px] ${fontBodyClass} ${
+                      highContrast ? 'bg-black text-yellow-300 border-yellow-300' : 'bg-white text-slate-900 border-slate-400 focus:ring-blue-300'
+                    }`}
+                    placeholder="Ketik jawaban Anda..."
+                    aria-label={currentNode.simpleLabel || currentNode.officialLabel}
                   />
                 )}
               </div>
 
-              {/* Helper Tools */}
-              <div className="flex justify-between items-center pt-2 text-xs border-t">
+              {/* BANTUAN SOROTAN & TEKS ASLI */}
+              <div className="flex justify-between items-center pt-2 text-xs border-t border-current">
                 <button
                   onClick={() => setShowOriginalText(!showOriginalText)}
-                  className="text-blue-600 underline font-medium"
+                  className="font-bold underline text-blue-600 dark:text-yellow-300 py-1"
                 >
-                  {showOriginalText ? 'Sembunyikan Teks Asli' : 'Lihat Teks Asli Web'}
+                  {showOriginalText ? 'Sembunyikan Label Asli' : 'Lihat Label Asli Web'}
                 </button>
 
                 <button
                   onClick={handleHighlight}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-2.5 py-1.5 rounded font-medium border"
+                  className="p-2 bg-slate-200 text-slate-900 font-bold rounded-lg border border-slate-400"
                 >
-                  🔍 Temukan di Halaman Web
+                  🔍 Temukan di Web
                 </button>
               </div>
 
-              {/* Original Text Drawer */}
               {showOriginalText && (
-                <div className="bg-gray-100 text-gray-800 p-3 rounded text-xs border space-y-1">
-                  <div className="font-semibold text-gray-700">Teks Asli Label Website:</div>
-                  <div className="font-mono bg-white p-2 rounded border">{currentNode.officialLabel}</div>
+                <div className="bg-slate-100 text-slate-900 p-3 rounded-lg border font-mono text-xs">
+                  {currentNode.officialLabel}
                 </div>
               )}
             </div>
           </div>
         ) : (
-          /* Review Step Summary */
+          /* RINGKASAN JAWABAN (REVIEW STEP) */
           <div className="space-y-4">
-            <h2 className="text-xl font-bold">Ringkasan Pengisian Formulir</h2>
-            <p className="text-xs opacity-80">
-              Periksa kembali jawaban Anda. Semua nilai telah disinkronkan langsung ke halaman website asli.
-            </p>
+            <h2 className="text-2xl font-black">Ringkasan Jawaban</h2>
+            <p className={fontBodyClass}>Periksa jawaban Anda sebelum dikirimkan ke web asli:</p>
 
-            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
               {formGraph.nodes.map((node, i) => {
                 const val = answers[node.nodeId];
-                const isMasked = node.sensitivity === 'financial' || node.sensitivity === 'identity';
-
                 return (
-                  <div key={node.nodeId} className="border p-3 rounded-lg text-xs flex justify-between items-center bg-gray-50 text-gray-900">
+                  <div key={node.nodeId} className={`p-4 rounded-xl border-2 flex justify-between items-center ${
+                    highContrast ? 'border-yellow-300 bg-black' : 'border-slate-300 bg-white'
+                  }`}>
                     <div>
-                      <div className="font-semibold text-gray-700">{node.simpleLabel || node.officialLabel}</div>
-                      <div className="font-mono text-blue-700 mt-0.5">
-                        {val ? (isMasked ? '••••••••' : String(val)) : <span className="text-red-500 italic">Belum diisi</span>}
+                      <div className="font-bold text-sm opacity-80">{node.simpleLabel || node.officialLabel}</div>
+                      <div className="font-extrabold text-base mt-1 text-blue-700 dark:text-yellow-300">
+                        {val || <span className="text-red-500 italic">Belum Diisi</span>}
                       </div>
                     </div>
                     <button
@@ -481,7 +532,7 @@ export default function SidePanel() {
                         setIsReviewing(false);
                         setCurrentIndex(i);
                       }}
-                      className="text-blue-600 underline text-xs"
+                      className="px-3 py-2 bg-slate-200 text-slate-900 font-bold rounded-lg underline text-xs min-h-[40px]"
                     >
                       Ubah
                     </button>
@@ -491,45 +542,51 @@ export default function SidePanel() {
             </div>
           </div>
         )}
-      </div>
+      </main>
 
-      {/* Footer Navigation Buttons */}
-      <div className="flex justify-between items-center pt-4 border-t mt-6">
-        <button
-          onClick={handleBack}
-          disabled={currentIndex === 0 && !isReviewing}
-          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold text-sm rounded-lg disabled:opacity-40"
-        >
-          &larr; Kembali
-        </button>
+      {/* 🔴 FOOTER TOMBOL NAVIGASI SANGAT BESAR */}
+      <footer className="pt-4 border-t-2 border-current mt-4">
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={handleBack}
+            disabled={currentIndex === 0 && !isReviewing}
+            className={`py-4 px-4 rounded-xl font-black text-base border-2 min-h-[52px] flex items-center justify-center ${
+              currentIndex === 0 && !isReviewing
+                ? 'opacity-30 bg-slate-300 text-slate-600 border-slate-300'
+                : 'bg-slate-200 text-slate-900 hover:bg-slate-300 border-slate-400'
+            }`}
+          >
+            ⬅️ Kembali
+          </button>
 
-        {!isReviewing ? (
-          <button
-            onClick={handleNext}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-lg shadow"
-          >
-            {currentIndex === formGraph.nodes.length - 1 ? 'Tinjau Jawaban' : 'Lanjut &rarr;'}
-          </button>
-        ) : (
-          <button
-            onClick={() => {
-              if (typeof chrome !== 'undefined' && chrome.tabs) {
-                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                  if (tabs[0]?.id) {
-                    chrome.tabs.sendMessage(tabs[0].id, {
-                      type: 'SUBMIT_TARGET_FORM',
-                      payload: { formId: formGraph.formId },
-                    });
-                  }
-                });
-              }
-            }}
-            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg shadow"
-          >
-            Kirim Formulir di Website Asli
-          </button>
-        )}
-      </div>
+          {!isReviewing ? (
+            <button
+              onClick={handleNext}
+              className={`${buttonPrimary} py-4 px-4 rounded-xl text-base min-h-[52px] flex items-center justify-center shadow-lg`}
+            >
+              {currentIndex === formGraph.nodes.length - 1 ? 'Tinjau 📋' : 'Lanjut ➡️'}
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                if (typeof chrome !== 'undefined' && chrome.tabs) {
+                  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                    if (tabs[0]?.id) {
+                      chrome.tabs.sendMessage(tabs[0].id, {
+                        type: 'SUBMIT_TARGET_FORM',
+                        payload: { formId: formGraph.formId },
+                      });
+                    }
+                  });
+                }
+              }}
+              className="bg-emerald-600 text-white font-black hover:bg-emerald-700 py-4 px-4 rounded-xl text-base min-h-[52px] shadow-lg col-span-2"
+            >
+              Kirim Formulir di Web Asli
+            </button>
+          )}
+        </div>
+      </footer>
     </div>
   );
 }
