@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 @theme {
+  /* Font Family Definition */
+  --font-serif: "Georgia", "Cambria", "Times New Roman", serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
   /* Warna Kustom Aksesara */
   --color-primary-50: #f0f7ff;
   --color-primary-100: #e0effe;
@@ -9,10 +13,22 @@
   --color-primary-700: #075985;
   --color-primary-900: #0c4a6e;
 
+  --color-brand-blue: #003399;
+  --color-brand-dark: #002673;
+
   --color-verified-500: #10b981;
 
   --color-accessible-bg: #fafafa;
   --color-accessible-text: #0f172a;
+}
+
+/* Base Reset untuk Mencegah Overflow Layar */
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background-color: #f7f9fc;
+  color: #0f172a;
 }
 
 /* Pengaturan Tambahan untuk High Contrast Mode */
