@@ -1,50 +1,108 @@
-"use client";
+'use client';
+
 import React, { useState } from 'react';
-import Link from 'next/link';
-import { Eye, ShieldCheck, Download } from 'lucide-react';
 
-export const Navbar = () => {
-  const [highContrast, setHighContrast] = useState(false);
-
-  const toggleContrast = () => {
-    setHighContrast(!highContrast);
-    document.body.classList.toggle('high-contrast');
-  };
+export default function Navbar() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
-      <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between" aria-label="Navigasi Utama">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold text-primary-700 tracking-tight">Aksesara</span>
-          <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-semibold">
-            Gemastik XIX
+    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 transition-all">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        
+        {/* Brand Logo */}
+        <div className="flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-xl bg-[#003399] flex items-center justify-center text-white font-serif font-bold text-lg shadow-md">
+            A
+          </div>
+          <span className="text-2xl font-serif font-bold text-[#003399] tracking-tight">
+            Aksesara
           </span>
         </div>
 
-        <div className="hidden md:flex items-center gap-6 font-medium text-slate-600">
-          <a href="#tentang" className="hover:text-primary-600 focus:outline-2 focus:outline-primary-500">Tentang</a>
-          <a href="#fitur" className="hover:text-primary-600 focus:outline-2 focus:outline-primary-500">Fitur Utama</a>
-          <a href="#arsitektur" className="hover:text-primary-600 focus:outline-2 focus:outline-primary-500">Arsitektur</a>
-          <a href="#tim" className="hover:text-primary-600 focus:outline-2 focus:outline-primary-500">Tim Kami</a>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleContrast}
-            className="p-2 rounded-lg border border-slate-300 hover:bg-slate-100 focus:ring-2 focus:ring-primary-500"
-            aria-label="Mode Kontras Tinggi"
-            title="Toggle High Contrast"
-          >
-            <Eye className="w-5 h-5 text-slate-700" />
-          </button>
-          <a
-            href="#install"
-            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition"
-          >
-            <Download className="w-4 h-4" /> Pasang Ekstensi
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center space-x-8 text-sm font-sans font-medium text-slate-600">
+          <a href="#beranda" className="text-[#003399] font-bold border-b-2 border-[#003399] pb-1 transition-all">
+            Beranda
           </a>
+          <a href="#tentang" className="hover:text-[#003399] transition-colors">
+            Tentang
+          </a>
+          <a href="#cara-kerja" className="hover:text-[#003399] transition-colors">
+            Cara Kerja
+          </a>
+          <a href="#download" className="hover:text-[#003399] transition-colors">
+            Dokumentasi & Unduh
+          </a>
+        </nav>
+
+        {/* Action Button & Mobile Toggle */}
+        <div className="flex items-center space-x-3">
+          <a
+            href="#download"
+            className="hidden sm:inline-flex bg-[#003399] hover:bg-[#002673] text-white font-sans font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-md shadow-blue-900/10 active:scale-95"
+          >
+            Pasang Ekstensi
+          </a>
+
+          {/* Hamburger Menu Button (Mobile) */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors"
+            aria-label="Toggle Navigation Menu"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isMobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
         </div>
-      </nav>
+      </div>
+
+      {/* Mobile Dropdown Menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden bg-white border-b border-slate-200 px-4 pt-3 pb-6 space-y-3 font-sans text-sm animate-fadeIn">
+          <a
+            href="#beranda"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="block py-2 text-[#003399] font-bold border-l-4 border-[#003399] pl-3"
+          >
+            Beranda
+          </a>
+          <a
+            href="#tentang"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="block py-2 text-slate-600 hover:text-[#003399] pl-3"
+          >
+            Tentang
+          </a>
+          <a
+            href="#cara-kerja"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="block py-2 text-slate-600 hover:text-[#003399] pl-3"
+          >
+            Cara Kerja
+          </a>
+          <a
+            href="#download"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="block py-2 text-slate-600 hover:text-[#003399] pl-3"
+          >
+            Dokumentasi & Unduh
+          </a>
+          <div className="pt-2">
+            <a
+              href="#download"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="w-full block text-center bg-[#003399] text-white font-bold py-3 rounded-xl shadow-md"
+            >
+              Pasang Ekstensi
+            </a>
+          </div>
+        </div>
+      )}
     </header>
   );
-};
+}

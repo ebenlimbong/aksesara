@@ -14,7 +14,7 @@ export default function SidePanel() {
   const [aiResults, setAiResults] = useState<Record<string, { explanation?: string; example?: string }>>({});
 
   // Accessibility States
-  const [textSize, setTextSize] = useState<'normal' | 'large' | 'xlarge'>('large'); // Default dibuat Large
+  const [textSize, setTextSize] = useState<'normal' | 'large' | 'xlarge'>('large');
   const [highContrast, setHighContrast] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -122,18 +122,16 @@ export default function SidePanel() {
           [currentNode.nodeId]: {
             ...prev[currentNode.nodeId],
             explanation: aiOutput.helpText || `Isikan data ${currentNode.officialLabel} Anda.`,
-            example: aiOutput.exampleFormat || 'Contoh: Bandung, Jakarta, Medan',
+            example: aiOutput.exampleFormat || 'Contoh: 3171234567890123',
           },
         }));
       }
     } catch (error) {
-      let fallbackExample = 'Isikan data sesuai dokumen resmi Anda.';
+      let fallbackExample = 'Contoh: 3171234567890123';
       const labelLower = (currentNode.officialLabel || '').toLowerCase();
-      if (labelLower.includes('lahir')) fallbackExample = 'Bandung, Jakarta, Medan, Lampung';
-      else if (labelLower.includes('kecamatan') || labelLower.includes('wil')) fallbackExample = 'Kec. Coblong, Kec. Sukajadi';
-      else if (labelLower.includes('jalan') || labelLower.includes('alamat')) fallbackExample = 'Jl. Merdeka No. 45, RT 02/RW 05';
-      else if (labelLower.includes('email')) fallbackExample = 'nama@student.itera.ac.id';
-      else if (labelLower.includes('telepon') || labelLower.includes('hp') || labelLower.includes('wa')) fallbackExample = '081234567890';
+      if (labelLower.includes('lahir')) fallbackExample = 'Contoh: Bandung';
+      else if (labelLower.includes('email')) fallbackExample = 'Contoh: nama@domain.com';
+      else if (labelLower.includes('telepon') || labelLower.includes('hp')) fallbackExample = 'Contoh: 081234567890';
 
       setAiResults((prev) => ({
         ...prev,
@@ -167,26 +165,12 @@ export default function SidePanel() {
     }
   };
 
-  const handleHighlight = () => {
-    if (!currentNode) return;
-    if (typeof chrome !== 'undefined' && chrome.tabs) {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'HIGHLIGHT_FIELD',
-            payload: { selector: currentNode.source.selector },
-          });
-        }
-      });
-    }
-  };
-
   const handleSpeak = (text: string) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'id-ID';
-      utterance.rate = 0.9; // Kecepatan bicara dibuat sedikit lebih lambat & jelas
+      utterance.rate = 0.85;
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       window.speechSynthesis.speak(utterance);
@@ -221,119 +205,135 @@ export default function SidePanel() {
     }
   };
 
-  const handleRefreshForm = async () => {
-    await scanTabForm();
-  };
-
   // Dynamic Typography Styles
   const fontTitleClass = textSize === 'xlarge' ? 'text-2xl' : textSize === 'large' ? 'text-xl' : 'text-lg';
-  const fontBodyClass = textSize === 'xlarge' ? 'text-lg' : textSize === 'large' ? 'text-base' : 'text-sm';
+  const fontBodyClass = textSize === 'xlarge' ? 'text-base' : textSize === 'large' ? 'text-sm' : 'text-xs';
 
-  // High Contrast Themes
-  const containerStyle = highContrast
-    ? 'bg-black text-yellow-300 min-h-screen p-4 border-l-4 border-yellow-400 font-sans'
-    : 'bg-slate-50 text-slate-900 min-h-screen p-4 border-l border-slate-200 font-sans';
-
-  const cardStyle = highContrast
-    ? 'border-2 border-yellow-300 bg-black p-4 rounded-xl space-y-4'
-    : 'border-2 border-blue-200 bg-white p-4 rounded-xl shadow-sm space-y-4';
-
-  const buttonPrimary = highContrast
-    ? 'bg-yellow-300 text-black font-extrabold hover:bg-yellow-400 focus:ring-4 focus:ring-white'
-    : 'bg-blue-700 text-white font-bold hover:bg-blue-800 focus:ring-4 focus:ring-blue-300';
+  // 🎨 PALET WARNA BARU: DARK MODE ELEGAN & SOFT UNTUK MATA
+  const theme = {
+    bgContainer: highContrast ? 'bg-[#101216] text-[#e2e8f0]' : 'bg-[#f7f8fa] text-[#1c1e21]',
+    headerTitle: highContrast ? 'text-white font-bold' : 'text-slate-900 font-bold',
+    badge: highContrast
+      ? 'bg-[#1e232d] text-[#60a5fa] border border-[#2b3548]'
+      : 'bg-[#fef3c7] text-[#92400e] border border-[#fde68a]',
+    card: highContrast
+      ? 'bg-[#181a20] border border-[#2e333d] text-white shadow-xl'
+      : 'bg-white border border-slate-200 text-slate-900 shadow-sm',
+    cardTitle: highContrast ? 'text-white' : 'text-slate-900',
+    cardSubtext: highContrast ? 'text-[#94a3b8]' : 'text-slate-600',
+    btnSecondary: highContrast
+      ? 'bg-[#1e222a] hover:bg-[#282d38] text-slate-200 border border-[#333a48]'
+      : 'bg-[#eef0f3] hover:bg-[#e2e5ea] text-slate-800 border border-slate-200',
+    btnPrimary: highContrast
+      ? 'bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold border border-[#3b82f6]'
+      : 'bg-[#003399] hover:bg-[#002673] text-white',
+    btnDisabled: highContrast
+      ? 'bg-[#16181d] text-[#475569] border border-[#212631] cursor-not-allowed'
+      : 'opacity-40 bg-[#eef0f3] text-slate-400 border-slate-200 cursor-not-allowed',
+    input: highContrast
+      ? 'bg-[#0d0e11] text-white border-2 border-[#3b82f6] placeholder-[#64748b] focus:outline-none'
+      : 'bg-white text-slate-900 border-2 border-slate-400 placeholder-slate-400 focus:outline-none focus:border-[#003399]',
+    aiBtn: highContrast
+      ? 'bg-[#222732] hover:bg-[#2c3342] text-slate-200 border border-[#384256]'
+      : 'bg-[#f4f5f7] border border-slate-200 text-slate-700 hover:bg-[#e8eaee]',
+    progressBar: highContrast ? 'bg-[#3b82f6]' : 'bg-[#003399]',
+    progressTrack: highContrast ? 'bg-[#262c36]' : 'bg-slate-200',
+    speakerBtn: highContrast
+      ? 'bg-[#1e293b] text-[#60a5fa] hover:bg-[#2c3e5a] border border-[#3b82f6]/40'
+      : 'bg-[#e8efff] text-[#003399] hover:bg-[#d0e0ff]',
+  };
 
   if (!formGraph || !formGraph.nodes || formGraph.nodes.length === 0) {
     return (
-      <div className={`${containerStyle} flex flex-col items-center justify-center space-y-6 text-center min-h-screen`}>
-        <div className="w-16 h-16 bg-blue-700 text-white rounded-full flex items-center justify-center font-bold text-2xl shadow-lg">
+      <div className={`${theme.bgContainer} min-h-screen p-4 flex flex-col items-center justify-center space-y-6 text-center font-serif`}>
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-md ${highContrast ? 'bg-[#2563eb] text-white' : 'bg-[#003399] text-white'}`}>
           A
         </div>
         <div className="space-y-2">
-          <h2 className="text-2xl font-black">Formulir Belum Siap</h2>
-          <p className={`${fontBodyClass} opacity-90 max-w-xs`}>
-            Buka halaman yang memiliki formulir di web, lalu tekan tombol besar di bawah.
+          <h2 className="text-xl font-bold font-serif">Formulir Belum Ditemukan</h2>
+          <p className="text-sm font-sans max-w-xs opacity-90">
+            Buka halaman web yang berisi formulir, lalu tekan tombol pindai ulang di bawah ini.
           </p>
         </div>
         <button
           onClick={scanTabForm}
-          className={`${buttonPrimary} text-lg px-6 py-4 rounded-xl shadow-lg border-2 w-full max-w-xs`}
-          aria-label="Memindai Ulang Formulir pada Tab Aktif"
+          className={`w-full font-serif font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 ${theme.btnSecondary}`}
         >
-          🔄 Pindai Formulir Web
+          <span className="text-lg">🔄</span>
+          <span>Pindai Ulang Form</span>
         </button>
       </div>
     );
   }
 
   const activeAi = currentNode ? aiResults[currentNode.nodeId] : undefined;
+  const progressPercent = Math.round(((currentIndex + 1) / formGraph.nodes.length) * 100);
 
   return (
-    <div className={`${containerStyle} flex flex-col justify-between min-h-screen`}>
-      {/* 🟢 HEADER ACCESSIBILITY BAR */}
+    <div className={`${theme.bgContainer} min-h-screen p-4 flex flex-col justify-between font-serif transition-colors duration-200`}>
+      {/* 🟢 HEADER */}
       <header className="space-y-3">
-        <div className="flex items-center justify-between border-b pb-3 border-current">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-700 text-white rounded-lg flex items-center justify-center font-black text-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-serif font-bold text-lg shadow-sm ${highContrast ? 'bg-[#2563eb] text-white' : 'bg-[#003399] text-white'}`}>
               A
             </div>
-            <div>
-              <h1 className="font-extrabold text-lg leading-tight">Aksesara</h1>
-              <p className="text-xs font-medium opacity-80 truncate max-w-[140px]">
-                {formGraph.title || 'Formulir Web'}
-              </p>
+            <div className="flex items-center space-x-2">
+              <span className={`font-serif text-base tracking-tight ${theme.headerTitle}`}>Aksesara</span>
+              <span className={`text-[11px] font-sans font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ${theme.badge}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${highContrast ? 'bg-[#60a5fa]' : 'bg-[#d97706]'}`}></span> Mode Terverifikasi
+              </span>
             </div>
           </div>
 
-          {/* Tombol Pindai Ulang Menonjol */}
           <button
-            onClick={handleRefreshForm}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border-2 transition-all ${
-              highContrast
-                ? 'border-yellow-300 text-yellow-300 hover:bg-yellow-300 hover:text-black'
-                : 'border-blue-600 bg-blue-50 text-blue-800 hover:bg-blue-100'
-            }`}
-            title="Pindai ulang halaman jika pertanyaan belum muncul"
-            aria-label="Pindai Ulang Formulir Halaman Ini"
+            onClick={() => window.close && window.close()}
+            className={`p-1 text-lg font-bold ${highContrast ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-600'}`}
+            aria-label="Tutup Panel"
           >
-            <span className="text-base">🔄</span>
-            <span>Pindai Ulang</span>
+            ✕
           </button>
         </div>
 
-        {/* 🛠️ TOOLBAR AKSESIBILITAS UTAMA */}
-        <div
-          className={`p-3 rounded-xl flex items-center justify-between gap-2 ${
-            highContrast ? 'bg-zinc-900 border border-yellow-300' : 'bg-slate-200 text-slate-900'
-          }`}
-          role="region"
-          aria-label="Pengaturan Aksesibilitas Teks dan Kontras"
+        {/* Tombol Pindai Ulang Form */}
+        <button
+          onClick={scanTabForm}
+          className={`w-full font-serif font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-sm transition-all ${theme.btnSecondary}`}
         >
-          <div className="flex items-center gap-1">
-            <span className="text-xs font-bold uppercase tracking-wider mr-1">Teks:</span>
+          <span className="text-base">🔄</span>
+          <span>Pindai Ulang Form</span>
+        </button>
+
+        {/* 🛠️ TOOLBAR AKSESIBILITAS */}
+        <div className={`p-1.5 rounded-2xl flex items-center justify-between border ${highContrast ? 'bg-[#181a20] border-[#2e333d]' : 'bg-[#f0f2f5] border-slate-200'}`}>
+          <div className={`p-0.5 rounded-xl flex items-center space-x-1 ${highContrast ? 'bg-[#0f1115]' : 'bg-[#e4e7eb]'}`}>
             <button
               onClick={() => setTextSize('normal')}
-              className={`px-2.5 py-1 text-xs font-bold rounded-md min-h-[36px] ${
-                textSize === 'normal' ? 'bg-blue-700 text-white' : 'bg-white text-black'
+              className={`px-3 py-1 text-xs font-serif rounded-lg transition-all ${
+                textSize === 'normal'
+                  ? highContrast ? 'bg-[#2563eb] text-white font-extrabold' : 'bg-white text-slate-900 shadow-sm font-bold'
+                  : highContrast ? 'text-slate-400' : 'text-slate-500'
               }`}
-              aria-label="Ukuran Teks Normal"
             >
               A
             </button>
             <button
               onClick={() => setTextSize('large')}
-              className={`px-2.5 py-1 text-sm font-bold rounded-md min-h-[36px] ${
-                textSize === 'large' ? 'bg-blue-700 text-white' : 'bg-white text-black'
+              className={`px-3 py-1 text-sm font-serif transition-all rounded-lg ${
+                textSize === 'large'
+                  ? highContrast ? 'bg-[#2563eb] text-white font-extrabold' : 'bg-white text-[#003399] shadow-sm font-bold'
+                  : highContrast ? 'text-slate-400' : 'text-slate-500'
               }`}
-              aria-label="Ukuran Teks Besark"
             >
               A+
             </button>
             <button
               onClick={() => setTextSize('xlarge')}
-              className={`px-2.5 py-1 text-base font-black rounded-md min-h-[36px] ${
-                textSize === 'xlarge' ? 'bg-blue-700 text-white' : 'bg-white text-black'
+              className={`px-3 py-1 text-base font-serif transition-all rounded-lg ${
+                textSize === 'xlarge'
+                  ? highContrast ? 'bg-[#2563eb] text-white font-extrabold' : 'bg-white text-[#003399] shadow-sm font-bold'
+                  : highContrast ? 'text-slate-400' : 'text-slate-500'
               }`}
-              aria-label="Ukuran Teks Sangat Besar"
             >
               A++
             </button>
@@ -341,39 +341,43 @@ export default function SidePanel() {
 
           <button
             onClick={() => setHighContrast(!highContrast)}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold border-2 min-h-[36px] ${
-              highContrast ? 'bg-yellow-300 text-black border-yellow-300' : 'bg-slate-800 text-white border-slate-800'
+            className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm shadow-sm transition-all border ${
+              highContrast
+                ? 'bg-[#2563eb] text-white border-[#3b82f6] font-bold'
+                : 'bg-[#2d3139] hover:bg-black text-white border-transparent'
             }`}
+            title="Toggle Mode Kontras Tinggi"
+            aria-label="Ubah Kontras Tampilan"
           >
-            {highContrast ? '☀️ Normal' : '🌙 Kontras'}
+            ◑
           </button>
         </div>
       </header>
 
-      {/* 🟡 AREA ISI UTAMA PERTANYAAN */}
-      <main className="my-4 flex-1">
+      {/* 🟡 AREA UTAMA (PROGRESS & CARD) */}
+      <main className="my-4 flex-1 space-y-3">
         {!isReviewing && currentNode ? (
-          <div className="space-y-4" role="aria-live" aria-live="polite">
-            {/* Indikator Langkah */}
-            <div className="space-y-1">
-              <div className="flex justify-between font-bold text-sm">
-                <span>Pertanyaan {currentIndex + 1} dari {formGraph.nodes.length}</span>
-                <span>{Math.round(((currentIndex + 1) / formGraph.nodes.length) * 100)}%</span>
+          <>
+            {/* INDIKATOR PROGRESS STEP */}
+            <div className="space-y-1.5 pt-1">
+              <div className={`flex justify-between items-center text-xs font-serif tracking-wider uppercase font-bold ${theme.cardSubtext}`}>
+                <span>LANGKAH {currentIndex + 1} DARI {formGraph.nodes.length}</span>
+                <span className="font-sans font-bold">{progressPercent}%</span>
               </div>
-              <div className="w-full bg-slate-300 h-3 rounded-full overflow-hidden">
+              <div className={`w-full ${theme.progressTrack} h-2 rounded-full overflow-hidden`}>
                 <div
-                  className={`h-3 transition-all duration-300 ${highContrast ? 'bg-yellow-300' : 'bg-blue-700'}`}
-                  style={{ width: `${((currentIndex + 1) / formGraph.nodes.length) * 100}%` }}
+                  className={`h-2 ${theme.progressBar} transition-all duration-300 rounded-full`}
+                  style={{ width: `${progressPercent}%` }}
                 />
               </div>
             </div>
 
-            {/* KOTAK PERTANYAAN */}
-            <div className={cardStyle}>
-              <div className="flex justify-between items-start gap-2">
-                <h2 className={`${fontTitleClass} font-black leading-snug`}>
+            {/* KOTAK KONTEN PERTANYAAN */}
+            <div className={`rounded-2xl p-4 space-y-4 ${theme.card}`}>
+              <div className="flex justify-between items-start gap-3">
+                <h2 className={`${fontTitleClass} font-serif font-bold leading-snug ${theme.cardTitle}`}>
                   {currentNode.simpleLabel || currentNode.officialLabel}
-                  {currentNode.required && <span className="text-red-500 ml-1" aria-label="Wajib diisi">*</span>}
+                  {currentNode.required && <span className="text-red-400 ml-1">*</span>}
                 </h2>
 
                 {/* Tombol Audio Bantuan */}
@@ -383,89 +387,80 @@ export default function SidePanel() {
                       ? stopSpeak()
                       : handleSpeak(currentNode.simpleLabel || currentNode.officialLabel)
                   }
-                  className={`p-3 rounded-full text-lg shrink-0 flex items-center justify-center font-bold min-w-[48px] min-h-[48px] ${
+                  className={`p-2.5 rounded-2xl shrink-0 transition-all ${
                     isSpeaking
-                      ? 'bg-red-600 text-white animate-pulse'
-                      : highContrast
-                      ? 'bg-yellow-300 text-black'
-                      : 'bg-blue-100 text-blue-900 border-2 border-blue-300'
+                      ? 'bg-red-500 text-white animate-pulse'
+                      : theme.speakerBtn
                   }`}
-                  title="Bacakan Pertanyaan"
                   aria-label="Bacakan Teks Pertanyaan Ini"
                 >
-                  🔊
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                  </svg>
                 </button>
               </div>
 
-              {/* BANTUAN AI (Satu Kolom yang Jelas) */}
-              <div className="grid grid-cols-2 gap-2 pt-2">
+              {/* TOMBOL BANTUAN AI */}
+              <div className="flex items-center gap-2 pt-1">
                 <button
                   onClick={() => callGeminiAi('explanation')}
                   disabled={aiLoading}
-                  className={`py-3 px-2 rounded-xl text-xs font-extrabold border-2 min-h-[44px] flex items-center justify-center gap-1 ${
-                    aiMode === 'explanation'
-                      ? 'bg-blue-700 text-white border-blue-900'
-                      : 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100'
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-serif font-semibold flex items-center gap-1.5 transition-all ${theme.aiBtn}`}
                 >
-                  {aiLoading && aiMode === 'explanation' ? '⏳ Memuat...' : '💡 Penjelasan (AI)'}
+                  <span>💡</span>
+                  <span>{aiLoading && aiMode === 'explanation' ? 'Memuat...' : 'Jelaskan (AI)'}</span>
                 </button>
 
                 <button
                   onClick={() => callGeminiAi('example')}
                   disabled={aiLoading}
-                  className={`py-3 px-2 rounded-xl text-xs font-extrabold border-2 min-h-[44px] flex items-center justify-center gap-1 ${
-                    aiMode === 'example'
-                      ? 'bg-purple-700 text-white border-purple-900'
-                      : 'bg-purple-50 text-purple-900 border-purple-300 hover:bg-purple-100'
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-serif font-semibold flex items-center gap-1.5 transition-all ${theme.aiBtn}`}
                 >
-                  {aiLoading && aiMode === 'example' ? '⏳ Memuat...' : '📝 Contoh (AI)'}
+                  <span>📝</span>
+                  <span>{aiLoading && aiMode === 'example' ? 'Memuat...' : 'Contoh (AI)'}</span>
                 </button>
               </div>
 
-              {/* AI Result Cards */}
+              {/* HASIL KELUARAN AI */}
               {aiMode === 'explanation' && activeAi?.explanation && (
-                <div className={`p-3 rounded-lg border-2 text-sm ${highContrast ? 'bg-zinc-900 border-yellow-300' : 'bg-blue-50 border-blue-300 text-blue-950'}`}>
-                  <strong className="block mb-1">💡 Penjelasan:</strong>
+                <div className={`p-3 rounded-xl text-xs font-sans space-y-1 ${highContrast ? 'bg-[#101319] border border-[#2b3548] text-slate-300' : 'bg-[#f8fafc] border border-slate-200 text-slate-700'}`}>
+                  <strong className="font-bold text-[#60a5fa]">💡 Penjelasan:</strong>
                   <p className={fontBodyClass}>{activeAi.explanation}</p>
                 </div>
               )}
 
               {aiMode === 'example' && activeAi?.example && (
-                <div className={`p-3 rounded-lg border-2 text-sm ${highContrast ? 'bg-zinc-900 border-yellow-300' : 'bg-purple-50 border-purple-300 text-purple-950'}`}>
-                  <strong className="block mb-1">📝 Contoh Jawaban:</strong>
-                  <p className={`${fontBodyClass} font-bold p-2 bg-white rounded border border-purple-200 text-slate-900`}>
+                <div className={`p-3 rounded-xl text-xs font-sans space-y-1 ${highContrast ? 'bg-[#101319] border border-[#2b3548] text-slate-300' : 'bg-[#f8fafc] border border-slate-200 text-slate-700'}`}>
+                  <strong className="font-bold text-[#60a5fa]">📝 Contoh Format:</strong>
+                  <p className={`${fontBodyClass} font-mono p-2 rounded ${highContrast ? 'bg-[#0d0e11] text-white border border-[#2e333d]' : 'bg-white text-slate-900 border border-slate-200'}`}>
                     {activeAi.example}
                   </p>
                 </div>
               )}
 
-              {/* INPUT FORM UTAMA */}
-              <div className="pt-2">
+              {/* INPUT FORM */}
+              <div className="space-y-2 pt-1">
+                <div className={`inline-block text-xs font-serif font-medium px-2.5 py-1 rounded-md ${highContrast ? 'bg-[#222732] text-slate-300 border border-[#333e52]' : 'bg-[#f0f2f5] text-slate-600'}`}>
+                  Ketik jawaban Anda di sini:
+                </div>
+
                 {currentNode.fieldType === 'textarea' ? (
                   <textarea
-                    rows={4}
+                    rows={3}
                     value={answers[currentNode.nodeId] || ''}
                     onChange={(e) => handleValueChange(e.target.value)}
-                    className={`w-full p-4 border-2 rounded-xl font-medium focus:ring-4 ${fontBodyClass} ${
-                      highContrast ? 'bg-black text-yellow-300 border-yellow-300' : 'bg-white text-slate-900 border-slate-400 focus:ring-blue-300'
-                    }`}
-                    placeholder="Tuliskan jawaban Anda di sini..."
-                    aria-label={currentNode.simpleLabel || currentNode.officialLabel}
+                    className={`w-full p-3 rounded-xl font-sans ${theme.input}`}
+                    placeholder="Contoh: Jl. Merdeka No. 45"
                   />
                 ) : currentNode.fieldType === 'select' ? (
                   <select
                     value={answers[currentNode.nodeId] || ''}
                     onChange={(e) => handleValueChange(e.target.value)}
-                    className={`w-full p-4 border-2 rounded-xl font-bold min-h-[52px] ${fontBodyClass} ${
-                      highContrast ? 'bg-black text-yellow-300 border-yellow-300' : 'bg-white text-slate-900 border-slate-400 focus:ring-blue-300'
-                    }`}
-                    aria-label={currentNode.simpleLabel || currentNode.officialLabel}
+                    className={`w-full p-3 rounded-xl font-sans ${theme.input}`}
                   >
-                    <option value="">-- Klik untuk Pilih Jawaban --</option>
+                    <option value="" className={highContrast ? 'bg-[#181a20] text-white' : 'bg-white text-slate-900'}>-- Pilih Jawaban --</option>
                     {currentNode.options?.map((opt, i) => (
-                      <option key={i} value={opt.value}>
+                      <option key={i} value={opt.value} className={highContrast ? 'bg-[#181a20] text-white' : 'bg-white text-slate-900'}>
                         {opt.label}
                       </option>
                     ))}
@@ -475,56 +470,49 @@ export default function SidePanel() {
                     type={currentNode.fieldType === 'number' ? 'number' : 'text'}
                     value={answers[currentNode.nodeId] || ''}
                     onChange={(e) => handleValueChange(e.target.value)}
-                    className={`w-full p-4 border-2 rounded-xl font-medium min-h-[52px] ${fontBodyClass} ${
-                      highContrast ? 'bg-black text-yellow-300 border-yellow-300' : 'bg-white text-slate-900 border-slate-400 focus:ring-blue-300'
-                    }`}
-                    placeholder="Ketik jawaban Anda..."
-                    aria-label={currentNode.simpleLabel || currentNode.officialLabel}
+                    className={`w-full p-3.5 rounded-xl font-sans ${theme.input}`}
+                    placeholder="Contoh: 3171234567890123"
                   />
                 )}
               </div>
 
-              {/* BANTUAN SOROTAN & TEKS ASLI */}
-              <div className="flex justify-between items-center pt-2 text-xs border-t border-current">
-                <button
-                  onClick={() => setShowOriginalText(!showOriginalText)}
-                  className="font-bold underline text-blue-600 dark:text-yellow-300 py-1"
-                >
-                  {showOriginalText ? 'Sembunyikan Label Asli' : 'Lihat Label Asli Web'}
-                </button>
+              {/* FOOTER HELPER CARD */}
+              <div className={`flex items-center justify-between text-xs font-sans pt-1 ${theme.cardSubtext}`}>
+                <div className="flex items-center gap-1">
+                  <span>⋮⋮</span>
+                  <span>{currentNode.fieldType === 'number' ? 'Harus berisi angka' : 'Isikan data sesuai dokumen'}</span>
+                </div>
 
                 <button
-                  onClick={handleHighlight}
-                  className="p-2 bg-slate-200 text-slate-900 font-bold rounded-lg border border-slate-400"
+                  onClick={() => setShowOriginalText(!showOriginalText)}
+                  className={`font-serif font-semibold hover:underline ${highContrast ? 'text-[#60a5fa]' : 'text-[#003399]'}`}
                 >
-                  🔍 Temukan di Web
+                  {showOriginalText ? 'Sembunyikan' : 'Lihat Label Asli'}
                 </button>
               </div>
 
               {showOriginalText && (
-                <div className="bg-slate-100 text-slate-900 p-3 rounded-lg border font-mono text-xs">
+                <div className={`p-2.5 rounded-lg font-mono text-xs ${highContrast ? 'bg-[#101216] text-slate-300 border border-[#2b3548]' : 'bg-slate-50 text-slate-700 border border-slate-200'}`}>
                   {currentNode.officialLabel}
                 </div>
               )}
             </div>
-          </div>
+          </>
         ) : (
           /* RINGKASAN JAWABAN (REVIEW STEP) */
-          <div className="space-y-4">
-            <h2 className="text-2xl font-black">Ringkasan Jawaban</h2>
-            <p className={fontBodyClass}>Periksa jawaban Anda sebelum dikirimkan ke web asli:</p>
+          <div className={`rounded-2xl p-4 space-y-3 ${theme.card}`}>
+            <h2 className="text-xl font-serif font-bold">Ringkasan Jawaban</h2>
+            <p className="text-xs font-sans opacity-80">Periksa kembali sebelum dikirimkan ke web asli:</p>
 
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
               {formGraph.nodes.map((node, i) => {
                 const val = answers[node.nodeId];
                 return (
-                  <div key={node.nodeId} className={`p-4 rounded-xl border-2 flex justify-between items-center ${
-                    highContrast ? 'border-yellow-300 bg-black' : 'border-slate-300 bg-white'
-                  }`}>
+                  <div key={node.nodeId} className={`p-3 rounded-xl border flex justify-between items-center text-xs ${highContrast ? 'bg-[#101216] border-[#2b3548] text-white' : 'bg-[#f8fafc] border-slate-200 text-slate-900'}`}>
                     <div>
-                      <div className="font-bold text-sm opacity-80">{node.simpleLabel || node.officialLabel}</div>
-                      <div className="font-extrabold text-base mt-1 text-blue-700 dark:text-yellow-300">
-                        {val || <span className="text-red-500 italic">Belum Diisi</span>}
+                      <div className="font-serif font-semibold opacity-80">{node.simpleLabel || node.officialLabel}</div>
+                      <div className="font-sans font-bold mt-0.5">
+                        {val || <span className="text-red-400 italic">Belum Diisi</span>}
                       </div>
                     </div>
                     <button
@@ -532,7 +520,7 @@ export default function SidePanel() {
                         setIsReviewing(false);
                         setCurrentIndex(i);
                       }}
-                      className="px-3 py-2 bg-slate-200 text-slate-900 font-bold rounded-lg underline text-xs min-h-[40px]"
+                      className={`font-serif font-bold hover:underline ${highContrast ? 'text-[#60a5fa]' : 'text-[#003399]'}`}
                     >
                       Ubah
                     </button>
@@ -544,27 +532,27 @@ export default function SidePanel() {
         )}
       </main>
 
-      {/* 🔴 FOOTER TOMBOL NAVIGASI SANGAT BESAR */}
-      <footer className="pt-4 border-t-2 border-current mt-4">
+      {/* 🔴 FOOTER TOMBOL NAVIGASI UTAMA */}
+      <footer className="pt-2">
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={handleBack}
             disabled={currentIndex === 0 && !isReviewing}
-            className={`py-4 px-4 rounded-xl font-black text-base border-2 min-h-[52px] flex items-center justify-center ${
-              currentIndex === 0 && !isReviewing
-                ? 'opacity-30 bg-slate-300 text-slate-600 border-slate-300'
-                : 'bg-slate-200 text-slate-900 hover:bg-slate-300 border-slate-400'
+            className={`py-3.5 px-4 rounded-2xl font-serif font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+              currentIndex === 0 && !isReviewing ? theme.btnDisabled : theme.btnSecondary
             }`}
           >
-            ⬅️ Kembali
+            <span>←</span>
+            <span>Kembali</span>
           </button>
 
           {!isReviewing ? (
             <button
               onClick={handleNext}
-              className={`${buttonPrimary} py-4 px-4 rounded-xl text-base min-h-[52px] flex items-center justify-center shadow-lg`}
+              className={`py-3.5 px-4 rounded-2xl font-serif font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition-all ${theme.btnPrimary}`}
             >
-              {currentIndex === formGraph.nodes.length - 1 ? 'Tinjau 📋' : 'Lanjut ➡️'}
+              <span>{currentIndex === formGraph.nodes.length - 1 ? 'Tinjau' : 'Lanjut'}</span>
+              <span>→</span>
             </button>
           ) : (
             <button
@@ -580,9 +568,9 @@ export default function SidePanel() {
                   });
                 }
               }}
-              className="bg-emerald-600 text-white font-black hover:bg-emerald-700 py-4 px-4 rounded-xl text-base min-h-[52px] shadow-lg col-span-2"
+              className={`col-span-2 py-3.5 px-4 rounded-2xl font-serif font-bold text-sm flex items-center justify-center gap-2 shadow-md transition-all ${theme.btnPrimary}`}
             >
-              Kirim Formulir di Web Asli
+              <span>Kirim Formulir di Web Asli</span>
             </button>
           )}
         </div>
