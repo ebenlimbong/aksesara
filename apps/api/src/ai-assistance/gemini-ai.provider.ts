@@ -1,14 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SanitizedFieldInput, FieldAssistanceOutput } from '@aksesara/form-schema';
-import { AiAssistanceProvider } from './mock-ai.provider';
+import { SanitizedFieldInput, FieldAssistanceOutput, AiAssistanceProvider } from './mock-ai.provider';
 
 @Injectable()
 export class GeminiAiProvider implements AiAssistanceProvider {
   private readonly logger = new Logger(GeminiAiProvider.name);
 
   async generateFieldAssistance(input: SanitizedFieldInput): Promise<FieldAssistanceOutput> {
-    const apiKey = process.env.AI_API_KEY;
-    const model = process.env.AI_MODEL || 'gemini-2.5-flash';
+    const apiKey = process.env.AI_API_KEY || process.env.GEMINI_API_KEY;
+    const model = process.env.AI_MODEL || process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
     if (!apiKey) {
       this.logger.warn('AI_API_KEY tidak terkonfigurasi. Kembali menggunakan fallback.');
@@ -17,24 +16,22 @@ export class GeminiAiProvider implements AiAssistanceProvider {
 
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-    const prompt = `Anda adalah Aksesara AI Engine, asisten aksesibilitas formulir web. 
-Tugas Anda adalah memberikan (1) Penjelasan Singkat Pertanyaan dan (2) Contoh Jawaban Nyata untuk label formulir web berikut.
+    const prompt = `Anda adalah Aksesara AI Engine, asisten aksesibilitas formulir web ramah disabilitas (WCAG 2.2 AAA).
+Tugas Anda adalah memberikan (1) Penjelasan Singkat Lengkap mengenai maksud pertanyaan formulir dan (2) Contoh Jawaban Nyata.
+
+DILARANG KERAS mengulang label pertanyaan sebagai penjelasan atau menjawab HANYA 1 KATA (contoh: jika label "Telepon", JANGAN menjawab "Telepon", melainkan "Isikan nomor telepon aktif yang dapat dihubungi melalui SMS atau WhatsApp.").
 
 Label Formulir: "${input.officialLabel}"
 Tipe Input: "${input.fieldType}"
 
 Aturan Respons:
-1. "simpleLabel": Pertanyaan singkat bahasa sehari-hari.
-2. "helpText": Penjelasan pertanyaan dalam 1 KALIMAT PENDEK yang sangat mudah dipahami.
-3. "exampleFormat": Berikan 2-3 contoh jawaban nyata yang tepat dan realistis (misal untuk tempat lahir: "Bandung, Jakarta, Medan", untuk kecamatan: "Kec. Coblong, Kec. Sukajadi").
-
-JANGAN membuat penjelasan atau contoh yang terlalu panjang.
+1. "helpText": Kalimat penjelasan 1-2 kalimat lengkap (10-20 kata) yang sangat mudah dipahami.
+2. "exampleFormat": Berikan 2-3 contoh jawaban nyata yang tepat dan realistis.
 
 Balas HANYA dalam format JSON valid berikut tanpa teks markdown tambahan:
 {
-  "simpleLabel": "...",
-  "helpText": "...",
-  "exampleFormat": "..."
+  "helpText": "Isikan ...",
+  "exampleFormat": "Contoh: ..."
 }`;
 
     try {
@@ -60,8 +57,7 @@ Balas HANYA dalam format JSON valid berikut tanpa teks markdown tambahan:
 
       const data = await response.json();
       let rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      
-      // Clean markdown code blocks if present
+
       rawContent = rawContent.replace(/```json/gi, '').replace(/```/g, '').trim();
 
       let parsed: { simpleLabel?: string; helpText?: string; exampleFormat?: string } = {};
@@ -73,12 +69,11 @@ Balas HANYA dalam format JSON valid berikut tanpa teks markdown tambahan:
 
       return {
         nodeId: input.nodeId,
-        simpleLabel: parsed.simpleLabel || `Berapa ${input.officialLabel}?`,
-        helpText: parsed.helpText || 'Isikan data yang sesuai dengan dokumen resmi Anda.',
+        simpleLabel: parsed.helpText || `Isikan data ${input.officialLabel} sesuai dokumen resmi Anda.`,
+        helpText: parsed.helpText || `Isikan data ${input.officialLabel} sesuai dokumen resmi Anda.`,
         exampleFormat: parsed.exampleFormat || '',
         warnings: [],
         confidence: 0.95,
-        verificationStatus: 'unverified-ai',
       };
     } catch (error) {
       this.logger.error('Error saat menghubungi Google Gemini API:', error);
