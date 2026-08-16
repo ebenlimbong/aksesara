@@ -5,7 +5,7 @@ import { AiAssistanceController } from './ai-assistance/ai-assistance.controller
 import { AiAssistanceService } from './ai-assistance/ai-assistance.service';
 import { MockAiProvider } from './ai-assistance/mock-ai.provider';
 import { GeminiAiProvider } from './ai-assistance/gemini-ai.provider';
-import { GroqAiProvider } from './ai-assistance/groq-ai.provider'; // <-- Import ini
+import { GroqAiProvider } from './ai-assistance/groq-ai.provider';
 import { PublicIntegrationController } from './public-integration/public-integration.controller';
 import { PublicIntegrationService } from './public-integration/public-integration.service';
 
@@ -17,7 +17,7 @@ import { PublicIntegrationService } from './public-integration/public-integratio
     AiAssistanceService,
     MockAiProvider,
     GeminiAiProvider,
-    GroqAiProvider, // <-- Tambahkan di sini
+    GroqAiProvider,
     PublicIntegrationService,
   ],
 })

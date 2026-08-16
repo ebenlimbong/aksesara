@@ -1,5 +1,24 @@
 import { Injectable } from '@nestjs/common';
-import { SanitizedFieldInput, FieldAssistanceOutput } from '@aksesara/form-schema';
+
+export interface SanitizedFieldInput {
+  nodeId: string;
+  officialLabel: string;
+  fieldType: string;
+  instruction?: string;
+  helpText?: string;
+  example?: string;
+  required?: boolean;
+  sensitivity?: string;
+}
+
+export interface FieldAssistanceOutput {
+  nodeId: string;
+  simpleLabel: string;
+  helpText: string;
+  exampleFormat: string;
+  warnings: string[];
+  confidence: number;
+}
 
 export interface AiAssistanceProvider {
   generateFieldAssistance(input: SanitizedFieldInput): Promise<FieldAssistanceOutput>;
@@ -46,7 +65,6 @@ export class MockAiProvider implements AiAssistanceProvider {
       exampleFormat,
       warnings: [],
       confidence: 0.92,
-      verificationStatus: 'unverified-ai',
     };
   }
 }

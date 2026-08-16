@@ -11,6 +11,7 @@ dist
 build
 out
 *.tsbuildinfo
+*.js.map
 
 # Environment & Sensitive Files
 .env
