@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  ShieldCheck,
   RefreshCw,
   Settings,
   ChevronDown,
@@ -18,6 +17,12 @@ import {
   Check,
 } from "lucide-react";
 import { FormGraph, FormNode } from "@aksesara/form-schema";
+
+// 🎨 Logo ekstensi (sama dengan icon di manifest / toolbar browser)
+const LOGO_URL =
+  typeof chrome !== "undefined" && chrome.runtime?.getURL
+    ? chrome.runtime.getURL("Icon.png")
+    : "/Icon.png";
 
 // 💡 Label Normalizer (Converts technical names like "id_wil_kabupaten" -> "Kabupaten")
 const formatDisplayLabel = (label: string): string => {
@@ -390,8 +395,8 @@ export default function SidePanel() {
   if (!formGraph || !formGraph.nodes || formGraph.nodes.length === 0) {
     return (
       <div className={`min-h-screen p-4 flex flex-col items-center justify-center space-y-6 text-center ${theme.bg}`}>
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md">
-          <ShieldCheck className="h-8 w-8" />
+        <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-md">
+          <img src={LOGO_URL} alt="Logo Aksesara" className="h-14 w-14 object-contain" />
         </div>
         <div className="space-y-2">
           <h2 className="text-lg font-bold">Formulir Belum Ditemukan</h2>
@@ -421,8 +426,8 @@ export default function SidePanel() {
       <header className={`px-4 pt-4 pb-2 border-b ${theme.headerBg}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs">
-              <ShieldCheck className="h-5 w-5" />
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white shadow-xs">
+              <img src={LOGO_URL} alt="Logo Aksesara" className="h-9 w-9 object-contain" />
             </div>
 
             <div>
