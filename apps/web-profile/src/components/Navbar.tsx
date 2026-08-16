@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -11,8 +12,15 @@ export default function Navbar() {
         
         {/* Brand Logo */}
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-xl bg-[#003399] flex items-center justify-center text-white font-serif font-bold text-lg shadow-md">
-            A
+          <div className="relative w-10 h-10 flex items-center justify-center">
+            <Image
+              src="/Icon.png"
+              alt="Logo Aksesara"
+              width={40}
+              height={40}
+              className="object-contain"
+              priority
+            />
           </div>
           <span className="text-2xl font-serif font-bold text-[#003399] tracking-tight">
             Aksesara

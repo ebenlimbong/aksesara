@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 export default function Footer() {
   return (
@@ -9,8 +10,14 @@ export default function Footer() {
           
           {/* Logo & Tagline */}
           <div className="flex items-center space-x-3">
-            <div className="w-7 h-7 rounded-lg bg-[#003399] text-white flex items-center justify-center font-serif font-bold text-sm">
-              A
+            <div className="relative w-8 h-8 flex items-center justify-center">
+              <Image
+                src="/Icon.png"
+                alt="Logo Aksesara"
+                width={32}
+                height={32}
+                className="object-contain"
+              />
             </div>
             <span className="font-serif font-bold text-lg text-[#003399]">
               Aksesara
