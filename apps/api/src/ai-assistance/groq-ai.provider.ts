@@ -15,15 +15,24 @@ export interface FormAssistResult {
   exampleFormat: string;
 }
 
+/**
+ * Model default. Groq rutin menonaktifkan (decommission) model lama,
+ * jadi model dibuat konfigurabel lewat env `GROQ_MODEL`.
+ * Cek model yang tersedia: GET https://api.groq.com/openai/v1/models
+ */
+const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b';
+
 @Injectable()
 export class GroqAiProvider {
   private readonly logger = new Logger(GroqAiProvider.name);
   private groq: Groq;
+  private readonly model: string;
 
   constructor() {
     this.groq = new Groq({
       apiKey: process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY || 'dummy_key',
     });
+    this.model = process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL;
   }
 
   async generateAssist(field: FormAssistPayload): Promise<FormAssistResult> {
@@ -61,7 +70,7 @@ FORMAT JSON HARUS SEPERTI INI:
             content: prompt,
           },
         ],
-        model: 'llama-3.3-70b-versatile',
+        model: this.model,
         response_format: { type: 'json_object' },
         temperature: 0.2,
       });
@@ -75,7 +84,7 @@ FORMAT JSON HARUS SEPERTI INI:
         exampleFormat: parsed.exampleFormat || 'Contoh: Data Valid',
       };
     } catch (error) {
-      this.logger.error('Gagal mendapatkan respon dari Groq API:', error);
+      this.logger.error(`Gagal mendapatkan respon dari Groq API (model: ${this.model}):`, error);
       let fallbackHelp = `Isikan data ${field.officialLabel} sesuai dengan dokumen resmi Anda.`;
       let fallbackExample = 'Contoh: Data Valid';
 

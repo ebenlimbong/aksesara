@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from 'react';
 
+// 🎨 Logo ekstensi (sama dengan icon di manifest / toolbar browser)
+const LOGO_URL =
+  typeof chrome !== 'undefined' && chrome.runtime?.getURL
+    ? chrome.runtime.getURL('Icon.png')
+    : '/Icon.png';
+
 export default function Popup() {
   const [activeUrl, setActiveUrl] = useState<string>('');
   const [fieldCount, setFieldCount] = useState<number | null>(null);
@@ -63,8 +69,8 @@ export default function Popup() {
       {/* Header */}
       <div className="flex items-center justify-between border-b pb-3">
         <div className="flex items-center space-x-2">
-          <div className="w-7 h-7 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-sm">
-            A
+          <div className="w-7 h-7 overflow-hidden rounded-lg bg-white flex items-center justify-center">
+            <img src={LOGO_URL} alt="Logo Aksesara" className="w-7 h-7 object-contain" />
           </div>
           <div>
             <h1 className="text-base font-bold leading-tight">Aksesara</h1>
