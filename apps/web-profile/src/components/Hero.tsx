@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 export default function Hero() {
   return (
@@ -140,8 +141,14 @@ export default function Hero() {
                 {/* Header Sidepanel */}
                 <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-[#003399] text-white flex items-center justify-center font-bold text-xs shadow-sm">
-                      A
+                    <div className="relative w-7 h-7 flex items-center justify-center shrink-0">
+                      <Image
+                        src="/Icon.png"
+                        alt="Logo Aksesara"
+                        width={28}
+                        height={28}
+                        className="object-contain"
+                      />
                     </div>
                     <div>
                       <div className="font-bold text-xs text-slate-900 leading-none">Aksesara</div>
